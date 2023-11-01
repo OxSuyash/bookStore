@@ -26,6 +26,10 @@ export const login = async (req, res, next) => {
         }
 
         sendCookie(user, res, `Welcome back, ${user.name}`, 200)
+
+        user.isLoggedIn = !user.isLoggedIn
+        await user.save()
+
     } catch (error) {
         next(error)
     }
@@ -59,7 +63,12 @@ export const register = async (req, res, next) => {
 
 }
 
-export const logout = (req, res) => {
+export const logout = async (req, res) => {
+    const user = req.user
+
+    user.isLoggedIn = !user.isLoggedIn
+    await user.save()
+
 
     res.status(200).cookie("token", "", {
         expires: new Date(Date.now()),
@@ -96,12 +105,15 @@ export const orderBook = async (req, res, next) => {
 
     const book = await Book.findById(bookId)
 
+    const bookName = book.title;
+
     if (!book) {
         return next(new ErrorHandler("No such book found on marketplace", 400))
     }
 
     if (book.quantity > 0) {
         await Orderbook.create({
+            itemName: bookName,
             itemId: bookId,
             customerId: userId
         })
@@ -129,38 +141,53 @@ export const orderBook = async (req, res, next) => {
 }
 
 export const myProfile = async (req, res, next) => {
-    const userId = req.user._id
+    try {
 
-    const user = await User.findById(userId)
 
-    const pastOrders = []
+        const user = await User.findById(req.user._id)
+        if (!user) {
+            return next(new ErrorHandler("error from myprofile api", 400))
+        }
 
-    const userName = user.name;
-    const userEmail = user.email;
-    const userWishList = user.wishlist
 
-    const userDetails = {
-        userName,
-        userEmail,
+        const pastOrders = []
 
+        const userName = user.name;
+        const userEmail = user.email;
+        const userWishList = user.wishlist
+        const loginStatus = user.isLoggedIn
+
+
+        const userDetails = {
+            userName,
+            userEmail,
+            loginStatus
+
+        }
+
+
+        // console.log(user.orderHistory.length)
+
+        for (let i = 0; i < user.orderHistory.length; i++) {
+            pastOrders.push(user.orderHistory[i].bookTitle)
+        }
+
+        pastOrders.reverse()
+
+        res.status(200).json({
+            success: true,
+            userDetails,
+            userWishList,
+            pastOrders,
+
+        })
+    } catch (error) {
+        next(error)
     }
-
-    // console.log(user.orderHistory.length)
-
-    for(let i = 0; i< user.orderHistory.length; i++) {
-        pastOrders.push(user.orderHistory[i].bookTitle)
-    }
-
-    res.status(200).json({
-        success: true,
-        userDetails,
-        userWishList,
-        pastOrders
-    })
 
 }
 
-export const viewBook = async(req, res) => {
+export const viewBook = async (req, res) => {
     const bookId = req.params.id;
 
     const book = await Book.findById(bookId)
@@ -177,8 +204,10 @@ export const viewBook = async(req, res) => {
 
 export const addWishlist = async (req, res, next) => {
     const user = req.user;
+    // console.log(user)
 
     const bookId = req.params.id;
+
 
     const book = await Book.findById(bookId)
     if (!book) {
@@ -192,6 +221,20 @@ export const addWishlist = async (req, res, next) => {
         success: true,
         message: "Book is added to the wishlist"
     })
+}
+
+
+export const fetchAllBooks = async (req, res) => {
+    try {
+        const books = await Book.find().sort({ _id: -1 })
+
+        res.status(200).json({
+            success: true,
+            books
+        })
+    } catch (error) {
+        next(error)
+    }
 }
 
 

@@ -23,6 +23,11 @@ const schema = new mongoose.Schema({
         type: [Object],
     },
 
+    isLoggedIn : {
+        type: Boolean,
+        default: false
+    },
+
     createdAt: {
         type: Date,
         default: Date.now,
